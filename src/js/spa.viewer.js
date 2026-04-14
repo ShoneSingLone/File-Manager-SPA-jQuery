@@ -56,19 +56,10 @@ window.spa.viewer = (function () {
         '</div>',
 
         '<footer id="spa-viewer-footer" class="viewer__footer hidden">',
-          '<div class="flex items-center justify-center gap-6">',
-            '<button id="spa-viewer-loop" class="spa-shell__btn spa-shell__btn--viewer">',
+          '<div class="viewer__footer-content">',
+            '<button id="spa-viewer-loop" class="spa-shell__btn spa-shell__btn--viewer" title="Toggle Loop">',
               spa.util.getSvg('repeat'),
             '</button>',
-            '<div class="flex items-center gap-2">',
-              '<span class="text-xs opacity-60">Speed</span>',
-              '<select id="spa-viewer-speed" class="bg-transparent border border-white/20 rounded px-2 py-1 text-sm outline-none text-white">',
-                '<option value="0.5" class="bg-zinc-900">0.5x</option>',
-                '<option value="1.0" class="bg-zinc-900" selected>1.0x</option>',
-                '<option value="1.5" class="bg-zinc-900">1.5x</option>',
-                '<option value="2.0" class="bg-zinc-900">2.0x</option>',
-              '</select>',
-            '</div>',
           '</div>',
         '</footer>',
       '</div>'
@@ -77,8 +68,11 @@ window.spa.viewer = (function () {
 
   var updateNavigation = function () {
     var index = stateMap.fileList.indexOf( stateMap.currentFile );
-    $('#spa-viewer-prev').toggle( index > 0 );
-    $('#spa-viewer-next').toggle( index < stateMap.fileList.length - 1 );
+    var $prev = $('#spa-viewer-prev');
+    var $next = $('#spa-viewer-next');
+    
+    $prev.prop('disabled', index <= 0).toggleClass('viewer__nav--disabled', index <= 0);
+    $next.prop('disabled', index >= stateMap.fileList.length - 1).toggleClass('viewer__nav--disabled', index >= stateMap.fileList.length - 1);
   };
 
   var formatTime = function ( seconds ) {
@@ -99,6 +93,15 @@ window.spa.viewer = (function () {
             '<div class="media-player__time">00:00 / 00:00</div>',
           '</div>',
           '<div class="media-player__group">',
+            '<div class="viewer__speed-control">',
+              '<span class="text-[10px] uppercase opacity-50">Speed</span>',
+              '<select class="player-speed bg-transparent border-none text-xs outline-none text-white cursor-pointer">',
+                '<option value="0.5" class="bg-zinc-900">0.5x</option>',
+                '<option value="1.0" class="bg-zinc-900" selected>1.0x</option>',
+                '<option value="1.5" class="bg-zinc-900">1.5x</option>',
+                '<option value="2.0" class="bg-zinc-900">2.0x</option>',
+              '</select>',
+            '</div>',
             '<div class="media-player__volume">',
               spa.util.getSvg('volume-2', 'w-4 h-4'),
               '<div class="media-player__volume-slider">',
@@ -127,17 +130,23 @@ window.spa.viewer = (function () {
       }
     });
 
+    $player.find('.player-speed').on('change', function() {
+      var speed = parseFloat($(this).val());
+      media.playbackRate = speed;
+      stateMap.playbackRate = speed;
+    });
+
     $player.find('.media-player__volume svg').on('click', function() {
       media.muted = !media.muted;
       $(this).parent().html(spa.util.getSvg(media.muted ? 'volume-x' : 'volume-2', 'w-4 h-4') + '<div class="media-player__volume-slider"><div class="media-player__volume-level"></div></div>');
       // Re-bind volume slider after HTML replacement
-      $volumeLevel = $player.find('.media-player__volume-level');
+      var $volLevel = $player.find('.media-player__volume-level');
       $player.find('.media-player__volume-slider').on('click', function(e) {
         var rect = this.getBoundingClientRect();
         var x = e.pageX - rect.left;
         var percent = x / rect.width;
         media.volume = percent;
-        $volumeLevel.css('width', (percent * 100) + '%');
+        $volLevel.css('width', (percent * 100) + '%');
       });
     });
 

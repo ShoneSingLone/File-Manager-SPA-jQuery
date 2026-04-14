@@ -3,6 +3,8 @@
  * Apple-style Glassmorphism Design using BEM
  */
 
+@import "tailwindcss";
+
 :root {
   --color-bg: #f5f5f7;
   --color-text: #1d1d1f;
@@ -439,10 +441,16 @@ body {
   justify-content: center;
 }
 
-.viewer__nav:hover {
+.viewer__nav:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.15);
   transform: translateY(-50%) scale(1.1);
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.viewer__nav:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .viewer__nav i {
@@ -482,12 +490,29 @@ body {
 .viewer__nav--next { right: 30px; }
 
 .viewer__footer {
-  padding: 30px;
+  padding: 20px 40px;
   background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
   position: absolute;
   bottom: 0;
   width: 100%;
   z-index: 50;
+}
+
+.viewer__footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.viewer__speed-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* BEM: media-player */

@@ -24,11 +24,11 @@ window.spa.browser = (function () {
 
   var getIcon = function ( type ) {
     switch ( type ) {
-      case 'folder': return 'folder';
-      case 'image':  return 'image';
-      case 'video':  return 'video';
-      case 'audio':  return 'music';
-      default:       return 'file-text';
+      case 'folder': return spa.util.getSvg('folder');
+      case 'image':  return spa.util.getSvg('image');
+      case 'video':  return spa.util.getSvg('video');
+      case 'audio':  return spa.util.getSvg('music');
+      default:       return spa.util.getSvg('file-text');
     }
   };
 
@@ -94,14 +94,14 @@ window.spa.browser = (function () {
         html += [
           '<div class="file-item" data-id="', file.id, '">',
             '<div class="file-item__icon-wrap">',
-              '<i data-lucide="', getIcon(file.type), '"></i>',
+              getIcon(file.type),
             '</div>',
             '<div class="file-item__info">',
               '<div class="file-item__name">', file.name, '</div>',
               '<div class="file-item__meta">', file.date, ' • ', file.size, '</div>',
             '</div>',
             '<button class="file-item__action file-menu-btn" data-id="', file.id, '">',
-              '<i data-lucide="more-vertical"></i>',
+              spa.util.getSvg('more-vertical'),
             '</button>',
           '</div>'
         ].join('');
