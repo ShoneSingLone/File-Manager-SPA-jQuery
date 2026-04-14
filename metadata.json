@@ -1,0 +1,6 @@
+{
+  "name": "Material File Manager",
+  "description": "A mobile-first file manager with Material 3 design, supporting image, video, and audio previews.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
