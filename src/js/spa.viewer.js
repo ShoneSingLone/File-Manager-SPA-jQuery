@@ -29,36 +29,36 @@ window.spa.viewer = (function () {
     main_html : [
       '<div id="spa-viewer" class="viewer hidden">',
         '<header class="viewer__header">',
-          '<button id="spa-viewer-close" class="spa-shell__btn">',
-            '<i data-lucide="x"></i>',
+          '<button id="spa-viewer-close" class="spa-shell__btn spa-shell__btn--viewer">',
+            spa.util.getSvg('x'),
           '</button>',
           '<div class="spa-shell__title" id="spa-viewer-title"></div>',
           '<div class="spa-shell__actions">',
-            '<button id="spa-viewer-slideshow" class="spa-shell__btn" title="Slideshow">',
-              '<i data-lucide="play"></i>',
+            '<button id="spa-viewer-slideshow" class="spa-shell__btn spa-shell__btn--viewer" title="Slideshow">',
+              spa.util.getSvg('play'),
             '</button>',
-            '<button id="spa-viewer-info" class="spa-shell__btn">',
-              '<i data-lucide="info"></i>',
+            '<button id="spa-viewer-info" class="spa-shell__btn spa-shell__btn--viewer">',
+              spa.util.getSvg('info'),
             '</button>',
-            '<button id="spa-viewer-download" class="spa-shell__btn">',
-              '<i data-lucide="download"></i>',
+            '<button id="spa-viewer-download" class="spa-shell__btn spa-shell__btn--viewer">',
+              spa.util.getSvg('download'),
             '</button>',
           '</div>',
         '</header>',
         
         '<div id="spa-viewer-content" class="viewer__content">',
           '<button id="spa-viewer-prev" class="viewer__nav viewer__nav--prev">',
-            '<i data-lucide="chevron-left"></i>',
+            spa.util.getSvg('chevron-left'),
           '</button>',
           '<button id="spa-viewer-next" class="viewer__nav viewer__nav--next">',
-            '<i data-lucide="chevron-right"></i>',
+            spa.util.getSvg('chevron-right'),
           '</button>',
         '</div>',
 
         '<footer id="spa-viewer-footer" class="viewer__footer hidden">',
           '<div class="flex items-center justify-center gap-6">',
-            '<button id="spa-viewer-loop" class="spa-shell__btn">',
-              '<i data-lucide="repeat"></i>',
+            '<button id="spa-viewer-loop" class="spa-shell__btn spa-shell__btn--viewer">',
+              spa.util.getSvg('repeat'),
             '</button>',
             '<div class="flex items-center gap-2">',
               '<span class="text-xs opacity-60">Speed</span>',
@@ -81,11 +81,116 @@ window.spa.viewer = (function () {
     $('#spa-viewer-next').toggle( index < stateMap.fileList.length - 1 );
   };
 
+  var formatTime = function ( seconds ) {
+    var min = Math.floor( seconds / 60 );
+    var sec = Math.floor( seconds % 60 );
+    return ( min < 10 ? '0' + min : min ) + ':' + ( sec < 10 ? '0' + sec : sec );
+  };
+
+  var createCustomPlayer = function ( $media, type ) {
+    var $player = $([
+      '<div class="media-player">',
+        '<div class="media-player__progress-container">',
+          '<div class="media-player__progress-bar"></div>',
+        '</div>',
+        '<div class="media-player__controls">',
+          '<div class="media-player__group">',
+            '<button class="spa-shell__btn spa-shell__btn--viewer player-play">', spa.util.getSvg('play'), '</button>',
+            '<div class="media-player__time">00:00 / 00:00</div>',
+          '</div>',
+          '<div class="media-player__group">',
+            '<div class="media-player__volume">',
+              spa.util.getSvg('volume-2', 'w-4 h-4'),
+              '<div class="media-player__volume-slider">',
+                '<div class="media-player__volume-level"></div>',
+              '</div>',
+            '</div>',
+            (type === 'video' ? '<button class="spa-shell__btn spa-shell__btn--viewer player-fullscreen">' + spa.util.getSvg('maximize') + '</button>' : ''),
+          '</div>',
+        '</div>',
+      '</div>'
+    ].join(''));
+
+    var media = $media[0];
+    var $playBtn = $player.find('.player-play');
+    var $progress = $player.find('.media-player__progress-bar');
+    var $time = $player.find('.media-player__time');
+    var $volumeLevel = $player.find('.media-player__volume-level');
+
+    var $volumeIcon = $player.find('.media-player__volume i');
+
+    $playBtn.on('click', function() {
+      if ( media.paused ) {
+        media.play();
+      } else {
+        media.pause();
+      }
+    });
+
+    $player.find('.media-player__volume svg').on('click', function() {
+      media.muted = !media.muted;
+      $(this).parent().html(spa.util.getSvg(media.muted ? 'volume-x' : 'volume-2', 'w-4 h-4') + '<div class="media-player__volume-slider"><div class="media-player__volume-level"></div></div>');
+      // Re-bind volume slider after HTML replacement
+      $volumeLevel = $player.find('.media-player__volume-level');
+      $player.find('.media-player__volume-slider').on('click', function(e) {
+        var rect = this.getBoundingClientRect();
+        var x = e.pageX - rect.left;
+        var percent = x / rect.width;
+        media.volume = percent;
+        $volumeLevel.css('width', (percent * 100) + '%');
+      });
+    });
+
+    $media.on('play', function() {
+      $playBtn.html(spa.util.getSvg('pause'));
+      if ( type === 'audio' ) $('.viewer__record').addClass('viewer__record--playing');
+      if ( stateMap.isSlideshow ) stopSlideshow();
+    });
+
+    $media.on('pause', function() {
+      $playBtn.html(spa.util.getSvg('play'));
+      if ( type === 'audio' ) $('.viewer__record').removeClass('viewer__record--playing');
+    });
+
+    $media.on('timeupdate', function() {
+      var percent = ( media.currentTime / media.duration ) * 100;
+      $progress.css('width', percent + '%');
+      $time.text( formatTime(media.currentTime) + ' / ' + formatTime(media.duration || 0) );
+    });
+
+    $player.find('.media-player__progress-container').on('click', function(e) {
+      var rect = this.getBoundingClientRect();
+      var x = e.pageX - rect.left;
+      var percent = x / rect.width;
+      media.currentTime = percent * media.duration;
+    });
+
+    $player.find('.media-player__volume-slider').on('click', function(e) {
+      var rect = this.getBoundingClientRect();
+      var x = e.pageX - rect.left;
+      var percent = x / rect.width;
+      media.volume = percent;
+      $volumeLevel.css('width', (percent * 100) + '%');
+    });
+
+    if ( type === 'video' ) {
+      $player.find('.player-fullscreen').on('click', function() {
+        if ( media.requestFullscreen ) media.requestFullscreen();
+      });
+    }
+
+    return $player;
+  };
+
   var renderPreview = function ( file ) {
     var $content = $('#spa-viewer-content');
     var $footer = $('#spa-viewer-footer');
+    var $viewer = $('#spa-viewer');
+    
     $content.find('.viewer__media, .viewer__media--image, .viewer__image-container, .viewer__audio-player, .viewer__zoom-controls, .fallback').remove();
     $footer.addClass('hidden');
+    $viewer.removeClass('viewer--image viewer--video viewer--audio');
+    $viewer.addClass('viewer--' + file.type);
     stateMap.imageScale = 1.0;
 
     switch ( file.type ) {
@@ -97,10 +202,10 @@ window.spa.viewer = (function () {
         
         var $zoomControls = $([
           '<div class="viewer__zoom-controls">',
-            '<button class="spa-shell__btn zoom-out"><i data-lucide="zoom-out"></i></button>',
+            '<button class="spa-shell__btn spa-shell__btn--viewer zoom-out">', spa.util.getSvg('zoom-out'), '</button>',
             '<span class="zoom-level flex items-center min-w-[40px] justify-center text-sm font-medium">100%</span>',
-            '<button class="spa-shell__btn zoom-in"><i data-lucide="zoom-in"></i></button>',
-            '<button class="spa-shell__btn zoom-reset"><i data-lucide="maximize"></i></button>',
+            '<button class="spa-shell__btn spa-shell__btn--viewer zoom-in">', spa.util.getSvg('zoom-in'), '</button>',
+            '<button class="spa-shell__btn spa-shell__btn--viewer zoom-reset">', spa.util.getSvg('maximize'), '</button>',
           '</div>'
         ].join(''));
         $content.append($zoomControls);
@@ -108,11 +213,13 @@ window.spa.viewer = (function () {
         
       case 'video':
         $footer.removeClass('hidden');
-        var $video = $('<video controls class="viewer__media max-w-[90%] max-h-[90%] object-contain shadow-2xl" autoplay></video>');
+        var $video = $('<video class="viewer__media max-w-[90%] max-h-[80%] object-contain shadow-2xl" autoplay></video>');
         $video.append('<source src="' + file.url + '" type="video/mp4">');
         $video[0].playbackRate = stateMap.playbackRate;
         $video[0].loop = stateMap.isLooping;
-        $content.append($video);
+        
+        var $player = createCustomPlayer($video, 'video');
+        $content.append($video).append($player);
         break;
         
       case 'audio':
@@ -122,25 +229,21 @@ window.spa.viewer = (function () {
             '<div class="viewer__record-wrap">',
               '<div class="viewer__record">',
                 '<div class="viewer__record-center">',
-                  '<i data-lucide="music" class="w-8 h-8"></i>',
+                  spa.util.getSvg('music', 'w-8 h-8'),
                 '</div>',
               '</div>',
-            '</div>',
-            '<div class="viewer__audio-controls">',
-              '<audio id="spa-viewer-audio" controls class="w-full"></audio>',
             '</div>',
           '</div>'
         ].join(''));
         
-        var $audio = $audioPlayer.find('audio');
+        var $audio = $('<audio></audio>');
         $audio.append('<source src="' + file.url + '" type="audio/mpeg">');
         $audio[0].playbackRate = stateMap.playbackRate;
         $audio[0].loop = stateMap.isLooping;
         
-        $audio.on('play', function() { $('.viewer__record').addClass('viewer__record--playing'); });
-        $audio.on('pause', function() { $('.viewer__record').removeClass('viewer__record--playing'); });
-        
-        $content.append($audioPlayer);
+        var $player = createCustomPlayer($audio, 'audio');
+        $audioPlayer.append($player);
+        $content.append($audioPlayer).append($audio);
         break;
         
       default:
@@ -303,7 +406,10 @@ window.spa.viewer = (function () {
 
     $(document).on('spa-file-open', function(e, data) {
       stateMap.currentFile = data.file;
-      stateMap.fileList = data.list || [data.file];
+      // Filter list to only include same type files from the same directory
+      stateMap.fileList = (data.list || []).filter(function(f) {
+        return f.type === data.file.type;
+      });
       $title.text(stateMap.currentFile.name);
       renderPreview(stateMap.currentFile);
       $viewer.removeClass('hidden');
