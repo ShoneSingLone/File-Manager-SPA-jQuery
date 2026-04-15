@@ -29,11 +29,17 @@ window.spa.viewer = (function () {
     main_html : [
       '<div id="spa-viewer" class="viewer hidden">',
         '<header class="viewer__header">',
-          '<button id="spa-viewer-close" class="spa-shell__btn spa-shell__btn--viewer">',
-            spa.util.getSvg('x'),
-          '</button>',
-          '<div class="spa-shell__title" id="spa-viewer-title"></div>',
+          '<div class="flex items-center gap-2">',
+            '<button id="spa-viewer-close" class="spa-shell__btn spa-shell__btn--viewer">',
+              spa.util.getSvg('x'),
+            '</button>',
+            '<div class="viewer__index text-xs opacity-50 font-mono ml-2"></div>',
+          '</div>',
+          '<div class="spa-shell__title truncate max-w-[40%]" id="spa-viewer-title"></div>',
           '<div class="spa-shell__actions">',
+            '<button id="spa-viewer-list-toggle" class="spa-shell__btn spa-shell__btn--viewer" title="Show List">',
+              spa.util.getSvg('list'),
+            '</button>',
             '<button id="spa-viewer-slideshow" class="spa-shell__btn spa-shell__btn--viewer" title="Slideshow">',
               spa.util.getSvg('play'),
             '</button>',
@@ -55,140 +61,30 @@ window.spa.viewer = (function () {
           '</button>',
         '</div>',
 
+        '<div id="spa-viewer-list" class="viewer__list hidden">',
+          '<div class="viewer__list-inner no-scrollbar"></div>',
+        '</div>',
+
         '<footer id="spa-viewer-footer" class="viewer__footer hidden">',
-          '<div class="viewer__footer-content">',
-            '<button id="spa-viewer-loop" class="spa-shell__btn spa-shell__btn--viewer" title="Toggle Loop">',
-              spa.util.getSvg('repeat'),
-            '</button>',
-          '</div>',
         '</footer>',
       '</div>'
     ].join('')
   };
 
+  var nextFile, prevFile, stopSlideshow;
+
   var updateNavigation = function () {
     var index = stateMap.fileList.indexOf( stateMap.currentFile );
-    var $prev = $('#spa-viewer-prev');
-    var $next = $('#spa-viewer-next');
+    var $index = $('.viewer__index');
+    $index.text( (index + 1) + ' / ' + stateMap.fileList.length );
     
-    $prev.prop('disabled', index <= 0).toggleClass('viewer__nav--disabled', index <= 0);
-    $next.prop('disabled', index >= stateMap.fileList.length - 1).toggleClass('viewer__nav--disabled', index >= stateMap.fileList.length - 1);
-  };
-
-  var formatTime = function ( seconds ) {
-    var min = Math.floor( seconds / 60 );
-    var sec = Math.floor( seconds % 60 );
-    return ( min < 10 ? '0' + min : min ) + ':' + ( sec < 10 ? '0' + sec : sec );
-  };
-
-  var createCustomPlayer = function ( $media, type ) {
-    var $player = $([
-      '<div class="media-player">',
-        '<div class="media-player__progress-container">',
-          '<div class="media-player__progress-bar"></div>',
-        '</div>',
-        '<div class="media-player__controls">',
-          '<div class="media-player__group">',
-            '<button class="spa-shell__btn spa-shell__btn--viewer player-play">', spa.util.getSvg('play'), '</button>',
-            '<div class="media-player__time">00:00 / 00:00</div>',
-          '</div>',
-          '<div class="media-player__group">',
-            '<div class="viewer__speed-control">',
-              '<span class="text-[10px] uppercase opacity-50">Speed</span>',
-              '<select class="player-speed bg-transparent border-none text-xs outline-none text-white cursor-pointer">',
-                '<option value="0.5" class="bg-zinc-900">0.5x</option>',
-                '<option value="1.0" class="bg-zinc-900" selected>1.0x</option>',
-                '<option value="1.5" class="bg-zinc-900">1.5x</option>',
-                '<option value="2.0" class="bg-zinc-900">2.0x</option>',
-              '</select>',
-            '</div>',
-            '<div class="media-player__volume">',
-              spa.util.getSvg('volume-2', 'w-4 h-4'),
-              '<div class="media-player__volume-slider">',
-                '<div class="media-player__volume-level"></div>',
-              '</div>',
-            '</div>',
-            (type === 'video' ? '<button class="spa-shell__btn spa-shell__btn--viewer player-fullscreen">' + spa.util.getSvg('maximize') + '</button>' : ''),
-          '</div>',
-        '</div>',
-      '</div>'
-    ].join(''));
-
-    var media = $media[0];
-    var $playBtn = $player.find('.player-play');
-    var $progress = $player.find('.media-player__progress-bar');
-    var $time = $player.find('.media-player__time');
-    var $volumeLevel = $player.find('.media-player__volume-level');
-
-    var $volumeIcon = $player.find('.media-player__volume i');
-
-    $playBtn.on('click', function() {
-      if ( media.paused ) {
-        media.play();
-      } else {
-        media.pause();
+    spa.viewer.list.render( stateMap.fileList, stateMap.currentFile, {
+      onSelect: function(file) {
+        stateMap.currentFile = file;
+        $('#spa-viewer-title').text( file.name );
+        renderPreview( file );
       }
     });
-
-    $player.find('.player-speed').on('change', function() {
-      var speed = parseFloat($(this).val());
-      media.playbackRate = speed;
-      stateMap.playbackRate = speed;
-    });
-
-    $player.find('.media-player__volume svg').on('click', function() {
-      media.muted = !media.muted;
-      $(this).parent().html(spa.util.getSvg(media.muted ? 'volume-x' : 'volume-2', 'w-4 h-4') + '<div class="media-player__volume-slider"><div class="media-player__volume-level"></div></div>');
-      // Re-bind volume slider after HTML replacement
-      var $volLevel = $player.find('.media-player__volume-level');
-      $player.find('.media-player__volume-slider').on('click', function(e) {
-        var rect = this.getBoundingClientRect();
-        var x = e.pageX - rect.left;
-        var percent = x / rect.width;
-        media.volume = percent;
-        $volLevel.css('width', (percent * 100) + '%');
-      });
-    });
-
-    $media.on('play', function() {
-      $playBtn.html(spa.util.getSvg('pause'));
-      if ( type === 'audio' ) $('.viewer__record').addClass('viewer__record--playing');
-      if ( stateMap.isSlideshow ) stopSlideshow();
-    });
-
-    $media.on('pause', function() {
-      $playBtn.html(spa.util.getSvg('play'));
-      if ( type === 'audio' ) $('.viewer__record').removeClass('viewer__record--playing');
-    });
-
-    $media.on('timeupdate', function() {
-      var percent = ( media.currentTime / media.duration ) * 100;
-      $progress.css('width', percent + '%');
-      $time.text( formatTime(media.currentTime) + ' / ' + formatTime(media.duration || 0) );
-    });
-
-    $player.find('.media-player__progress-container').on('click', function(e) {
-      var rect = this.getBoundingClientRect();
-      var x = e.pageX - rect.left;
-      var percent = x / rect.width;
-      media.currentTime = percent * media.duration;
-    });
-
-    $player.find('.media-player__volume-slider').on('click', function(e) {
-      var rect = this.getBoundingClientRect();
-      var x = e.pageX - rect.left;
-      var percent = x / rect.width;
-      media.volume = percent;
-      $volumeLevel.css('width', (percent * 100) + '%');
-    });
-
-    if ( type === 'video' ) {
-      $player.find('.player-fullscreen').on('click', function() {
-        if ( media.requestFullscreen ) media.requestFullscreen();
-      });
-    }
-
-    return $player;
   };
 
   var renderPreview = function ( file ) {
@@ -196,38 +92,35 @@ window.spa.viewer = (function () {
     var $footer = $('#spa-viewer-footer');
     var $viewer = $('#spa-viewer');
     
+    // Stop and clear any existing media to prevent overlap
+    $content.find('video, audio').each(function() {
+      this.pause();
+      this.src = "";
+      this.load();
+      $(this).remove();
+    });
+
     $content.find('.viewer__media, .viewer__media--image, .viewer__image-container, .viewer__audio-player, .viewer__zoom-controls, .fallback').remove();
     $footer.addClass('hidden');
     $viewer.removeClass('viewer--image viewer--video viewer--audio');
     $viewer.addClass('viewer--' + file.type);
-    stateMap.imageScale = 1.0;
+
+    var handlers = {
+      onNext: function() { stopSlideshow(); nextFile(); },
+      onPrev: function() { stopSlideshow(); prevFile(); },
+      onPlay: function() { if ( stateMap.isSlideshow ) stopSlideshow(); }
+    };
 
     switch ( file.type ) {
       case 'image':
-        var $imgContainer = $('<div class="viewer__image-container"></div>');
-        var $img = $('<img src="' + file.url + '" class="viewer__media--image" referrerPolicy="no-referrer">');
-        $imgContainer.append($img);
-        $content.append($imgContainer);
-        
-        var $zoomControls = $([
-          '<div class="viewer__zoom-controls">',
-            '<button class="spa-shell__btn spa-shell__btn--viewer zoom-out">', spa.util.getSvg('zoom-out'), '</button>',
-            '<span class="zoom-level flex items-center min-w-[40px] justify-center text-sm font-medium">100%</span>',
-            '<button class="spa-shell__btn spa-shell__btn--viewer zoom-in">', spa.util.getSvg('zoom-in'), '</button>',
-            '<button class="spa-shell__btn spa-shell__btn--viewer zoom-reset">', spa.util.getSvg('maximize'), '</button>',
-          '</div>'
-        ].join(''));
-        $content.append($zoomControls);
+        spa.viewer.image.render( file, $content, handlers );
         break;
         
       case 'video':
         $footer.removeClass('hidden');
         var $video = $('<video class="viewer__media max-w-[90%] max-h-[80%] object-contain shadow-2xl" autoplay></video>');
-        $video.append('<source src="' + file.url + '" type="video/mp4">');
-        $video[0].playbackRate = stateMap.playbackRate;
-        $video[0].loop = stateMap.isLooping;
-        
-        var $player = createCustomPlayer($video, 'video');
+        $video.attr('src', file.url);
+        var $player = spa.viewer.player.create($video, 'video', handlers);
         $content.append($video).append($player);
         break;
         
@@ -245,12 +138,9 @@ window.spa.viewer = (function () {
           '</div>'
         ].join(''));
         
-        var $audio = $('<audio></audio>');
-        $audio.append('<source src="' + file.url + '" type="audio/mpeg">');
-        $audio[0].playbackRate = stateMap.playbackRate;
-        $audio[0].loop = stateMap.isLooping;
-        
-        var $player = createCustomPlayer($audio, 'audio');
+        var $audio = $('<audio autoplay></audio>');
+        $audio.attr('src', file.url);
+        var $player = spa.viewer.player.create($audio, 'audio', handlers);
         $audioPlayer.append($player);
         $content.append($audioPlayer).append($audio);
         break;
@@ -280,10 +170,19 @@ window.spa.viewer = (function () {
     $('#spa-viewer-close').on('click', function() {
       $viewer.addClass('hidden');
       $('#spa-viewer-content').empty();
+      $('#spa-viewer-list').addClass('hidden');
       stopSlideshow();
     });
 
-    var nextFile = function () {
+    $('#spa-viewer-list-toggle').on('click', function() {
+      $('#spa-viewer-list').toggleClass('hidden');
+      $(this).toggleClass('spa-shell__btn--primary');
+      if ( !$('#spa-viewer-list').hasClass('hidden') ) {
+        updateNavigation();
+      }
+    });
+
+    nextFile = function () {
       var index = stateMap.fileList.indexOf( stateMap.currentFile );
       if ( index < stateMap.fileList.length - 1 ) {
         stateMap.currentFile = stateMap.fileList[ index + 1 ];
@@ -294,7 +193,7 @@ window.spa.viewer = (function () {
       return false;
     };
 
-    var prevFile = function () {
+    prevFile = function () {
       var index = stateMap.fileList.indexOf( stateMap.currentFile );
       if ( index > 0 ) {
         stateMap.currentFile = stateMap.fileList[ index - 1 ];
@@ -315,7 +214,7 @@ window.spa.viewer = (function () {
       }, 3000);
     };
 
-    var stopSlideshow = function () {
+    stopSlideshow = function () {
       stateMap.isSlideshow = false;
       $('#spa-viewer-slideshow').removeClass('spa-shell__btn--primary');
       if (stateMap.slideshowTimer) {
@@ -354,19 +253,6 @@ window.spa.viewer = (function () {
       $('.viewer__media--image').css('transform', 'scale(' + stateMap.imageScale + ')');
       $('.zoom-level').text(Math.round(stateMap.imageScale * 100) + '%');
     };
-
-    $('#spa-viewer-speed').on('change', function() {
-      stateMap.playbackRate = parseFloat( $(this).val() );
-      var media = $('#spa-viewer-content').find('video, audio')[0];
-      if ( media ) media.playbackRate = stateMap.playbackRate;
-    });
-
-    $('#spa-viewer-loop').on('click', function() {
-      stateMap.isLooping = !stateMap.isLooping;
-      $(this).toggleClass('spa-shell__btn--primary', stateMap.isLooping);
-      var media = $('#spa-viewer-content').find('video, audio')[0];
-      if ( media ) media.loop = stateMap.isLooping;
-    });
 
     $('#spa-viewer-info').on('click', function() {
       var file = stateMap.currentFile;
